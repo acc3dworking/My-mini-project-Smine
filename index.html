@@ -7,6 +7,7 @@ body{display:flex;align-items:center;justify-content:center}canvas{display:block
 <div id="mpT" style="font:bold 20px sans-serif;margin-bottom:6px"></div>
 <div id="mpRoom" style="display:none"><div id="mpRoomL" style="color:#bbb"></div><div id="mpCode" style="font:bold 46px monospace;letter-spacing:8px;margin:10px 0;color:#9fe"></div></div>
 <div id="mpJoin" style="display:none"><div id="mpJoinL" style="color:#bbb;margin-bottom:6px"></div><input id="mpJoinIn" maxlength="6" autocapitalize="characters" autocomplete="off" style="font:bold 30px monospace;letter-spacing:6px;text-transform:uppercase;width:230px;background:#1a1a24;color:#fff;border:1px solid #555;border-radius:10px;padding:8px 12px;box-sizing:border-box"><button id="mpJoinGo" class="mb" style="background:#2f7dff"></button></div>
+<label style="display:block;margin-top:10px;color:#ccc"><input type="checkbox" id="mpLan" checked> <span id="mpLanL"></span></label>
 <div id="mpSt" style="margin-top:10px;color:#9fe"></div>
 <div id="mpErr" style="color:#f88;margin-top:8px"></div>
 <div id="mpA" style="display:none"><div id="mpI" style="color:#bbb;margin:6px 0"></div><textarea id="mpOut" readonly rows="3"></textarea><button id="mpCopy" class="mb"></button></div>
@@ -163,9 +164,11 @@ function ep(e){return EF.map(k=>{let v=e[k];if(k=='at')return v||'';if(k=='w')re
 function ap(o,a){EF.forEach((k,i)=>{let v=a[i];if(k=='at')v=v||null;else if(k=='g'||k=='blk'||k=='dead'||k=='bot'||k=='p2')v=!!v;o[k]=v})}
 function setE(o,a,first){const ox=o.x,oy=o.y;ap(o,a);o.tx=o.x;o.ty=o.y;if(!first&&ox!=null&&Math.abs(o.tx-ox)<250&&Math.abs(o.ty-oy)<250){o.x=ox;o.y=oy}}
 function qin(){const r=NET.rin,p=NET.pend,n={sx:r.sx||0,sy:r.sy||0,j:p.j,a:r.a,a_hold:r.ah,s:p.s,w:p.w,b:r.b,tw:p.tw,ax:r.ax,ay:r.ay};p.j=p.s=p.w=p.tw=0;return n}
-function netTickHost(dt){NET.sacc+=dt;if(NET.sacc<.05)return;NET.sacc=0;if(!NET.dc||NET.dc.readyState!='open'||!Q)return;
+function probeLink(){const pc=NET.pc||(NET.conn&&NET.conn.peerConnection);if(!pc||!pc.getStats)return;pc.getStats().then(rep=>{let sel=null;rep.forEach(r=>{if(r.type=='candidate-pair'&&r.state=='succeeded'&&(r.nominated||r.selected))sel=r});if(sel){const lc=rep.get(sel.localCandidateId),rc=rep.get(sel.remoteCandidateId),a=lc&&lc.candidateType,b=rc&&rc.candidateType;NET.link=(a=='relay'||b=='relay')?'relay':((a=='host'&&b=='host')?'LAN':'internet')}}).catch(()=>{})}
+function netPing(dt){if(!NET.dc||NET.dc.readyState!='open')return;NET.pacc=(NET.pacc||0)+dt;if(NET.pacc>1){NET.pacc=0;try{NET.dc.send(JSON.stringify({t:'p',ts:performance.now()}))}catch(e){}}NET.lacc=(NET.lacc||0)+dt;if(NET.lacc>4){NET.lacc=0;probeLink()}}
+function netTickHost(dt){netPing(dt);NET.sacc+=dt;if(NET.sacc<.033)return;NET.sacc=0;if(!NET.dc||NET.dc.readyState!='open'||!Q)return;
 try{NET.dc.send(JSON.stringify({t:'s',ps:[ep(P),ep(Q)],bs:bots.map(ep),it:items.map(i=>[i.t,rd(i.x),rd(i.y),rd(i.ang||0),i.th?1:0,Math.round(i.life||0)]),ar:arrows.map(a=>[Math.round(a.x),Math.round(a.y),Math.round(a.vx),Math.round(a.vy),a.t||0,a.crit?1:0]),me:meds.map(m=>[Math.round(m.x),Math.round(m.y),Math.round(m.life)]),st:S,w:wave,k:kills,mi,mg:msg,mt:rd(msgT),sh:rd(sh),tm:rd(t),gm:NET.gmode,win:NET.win,ev:NQ.splice(0)}))}catch(e){}}
-function netTickGuest(dt){if(!NET.dc||NET.dc.readyState!='open')return;
+function netTickGuest(dt){if(!NET.dc||NET.dc.readyState!='open')return;netPing(dt);
 if(!NET.snapAt&&t-NET.hAt>.3){NET.hAt=t;try{NET.dc.send(JSON.stringify({t:'h',sw:startW}))}catch(e){}}
 const n=NET.lastN;if(!n)return;for(const k of['j','s','w','tw'])if(n[k])NET.ged[k]=1;NET.iacc+=dt;if(NET.iacc<.033)return;NET.iacc=0;const g2=NET.ged;
 try{NET.dc.send(JSON.stringify({t:'i',sx:rd(n.sx||0),sy:rd(n.sy||0),a:n.a?1:0,ah:n.a_hold?1:0,b:n.b?1:0,j:g2.j,s:g2.s,w:g2.w,tw:g2.tw,ax:n.ax==null?null:Math.round(n.ax*100)/100,ay:n.ay==null?null:Math.round(n.ay*100)/100}))}catch(e){}g2.j=g2.s=g2.w=g2.tw=0}
@@ -187,7 +190,7 @@ for(const ev of m.ev)onEv(ev)}
 function updGuest(dt){
 for(const p of PL)if(p.am){const nx=p.bx+Math.sin((t+NET.toff)*.9)*p.am;p.dx=nx-p.x;p.x=nx}
 const E=[P,Q].concat(bots);
-for(const e of E){if(!e)continue;if(e.tx!=null){e.tx+=e.vx*dt;e.ty+=e.vy*dt;const k=Math.min(1,dt*16);e.x+=(e.tx-e.x)*k;e.y+=(e.ty-e.y)*k}
+for(const e of E){if(!e)continue;if(e.tx!=null){e.tx+=e.vx*dt;e.ty+=e.vy*dt;const k=Math.min(1,dt*24);e.x+=(e.tx-e.x)*k;e.y+=(e.ty-e.y)*k}
 e.ph+=Math.abs(e.vx)*dt*.07;e.lean+=((e.at?(e.atT/(e.dur||1)<.2?-6:10)*(AT[e.at]&&AT[e.at].m>=1.4?1.7:1)*e.f:e.wind>0?-7*e.f:Math.max(-8,Math.min(8,e.vx*.03)))-e.lean)*Math.min(1,18*dt);e.sq-=dt;e.fl-=dt;e.dz-=dt;e.rel=(e.rel||0)-dt;if(e.at)e.atT+=dt}
 for(const e of E)if(e&&!e.dead&&(e.roll>0||e.at=='th'||e.at=='ru'||e.at=='dv'))ghosts.push({j:pose(e),w:e.w,f:e.f,b:e.bot,l:.2});
 for(const o of ghosts)o.l-=dt;ghosts=ghosts.filter(o=>o.l>0);
@@ -197,21 +200,22 @@ for(const p of pts){p.x+=p.vx*dt;p.y+=p.vy*dt;if(!p.rg)p.vy+=600*dt;p.l-=dt}pts=
 for(const r of rocks)r.l-=dt;rocks=rocks.filter(r=>r.l>0);msgT-=dt}
 function onMsg(m){if(m.t=='i'&&isHost()){const r=NET.rin;r.sx=m.sx;r.sy=m.sy;r.a=m.a;r.ah=m.ah;r.b=m.b;r.ax=m.ax;r.ay=m.ay;if(m.j)NET.pend.j=1;if(m.s)NET.pend.s=1;if(m.w)NET.pend.w=1;if(m.tw)NET.pend.tw=1}
 else if(m.t=='h'&&isHost()){if(!NET.started){NET.gsw=m.sw||'fist';NET.started=1;start()}}
-else if(m.t=='s'&&isGuest())onSnap(m)}
+else if(m.t=='s'&&isGuest())onSnap(m);else if(m.t=='p'){try{NET.dc.send(JSON.stringify({t:'r',ts:m.ts}))}catch(e){}}else if(m.t=='r'){NET.rtt=Math.round(performance.now()-m.ts)}}
 function b64(b){let s='';for(const x of b)s+=String.fromCharCode(x);return btoa(s)}
 function unb64(s){return Uint8Array.from(atob(s),c=>c.charCodeAt(0))}
 async function enc(o){const j=JSON.stringify(o);if(typeof CompressionStream!='undefined'){const cs=new CompressionStream('deflate-raw'),w=cs.writable.getWriter();w.write(new TextEncoder().encode(j));w.close();return 'z'+b64(new Uint8Array(await new Response(cs.readable).arrayBuffer()))}return 'r'+btoa(unescape(encodeURIComponent(j)))}
 async function dec(s){s=s.trim();if(s[0]=='z'){const ds=new DecompressionStream('deflate-raw'),w=ds.writable.getWriter();w.write(unb64(s.slice(1)));w.close();return JSON.parse(new TextDecoder().decode(await new Response(ds.readable).arrayBuffer()))}return JSON.parse(decodeURIComponent(escape(atob(s.slice(1)))))}
 const waitICE=pc=>new Promise(res=>{if(pc.iceGatheringState=='complete')return res();const f=()=>{if(pc.iceGatheringState=='complete'){pc.removeEventListener('icegatheringstatechange',f);res()}};pc.addEventListener('icegatheringstatechange',f);setTimeout(res,4000)});
 function setupDC(dc){const op=()=>{NET.dc=dc;NET.open=true;mpShow(false);S='menu';view=6;NET.started=0;NET.snapAt=0;NET.hAt=-9};dc.onopen=op;dc.onmessage=e=>{try{onMsg(JSON.parse(e.data))}catch(er){}};dc.onclose=()=>{if(NET.open){NET.err=L('Connection lost','Соединение потеряно');netClose();view=6}};if(dc.readyState=='open')op()}
-async function hostStart(){netClose(1);NET.role='host';const pc=new RTCPeerConnection({iceServers:[{urls:'stun:stun.l.google.com:19302'}]});NET.pc=pc;hook(pc);setupDC(pc.createDataChannel('g'));await pc.setLocalDescription(await pc.createOffer());await waitICE(pc);NET.code=await enc(pc.localDescription)}
+async function hostStart(){netClose(1);NET.role='host';await unmask();const pc=new RTCPeerConnection({iceServers:[]});NET.pc=pc;hook(pc);setupDC(pc.createDataChannel('g'));await pc.setLocalDescription(await pc.createOffer());await waitICE(pc);NET.code=await enc(pc.localDescription)}
 async function hostFinish(code){await NET.pc.setRemoteDescription(await dec(code))}
-async function guestJoin(code){netClose(1);NET.role='guest';const pc=new RTCPeerConnection({iceServers:[{urls:'stun:stun.l.google.com:19302'}]});NET.pc=pc;hook(pc);pc.ondatachannel=e=>setupDC(e.channel);await pc.setRemoteDescription(await dec(code));await pc.setLocalDescription(await pc.createAnswer());await waitICE(pc);NET.code=await enc(pc.localDescription)}
-function netClose(keep){const was=NET.open;try{NET.dc&&(NET.dc.onclose=null,NET.dc.close())}catch(e){}try{NET.pc&&NET.pc.close()}catch(e){}try{NET.peer&&NET.peer.destroy()}catch(e){}NET.peer=null;NET.conn=null;NET.dc=null;NET.pc=null;NET.open=false;NET.role=null;NET.started=0;NET.snapAt=0;NET.gb.clear();Q=null;NET.win='';NET.code='';if(S=='play'||S=='over')S='menu';if(!keep){view=0;mpShow(false)}paused=false}
+async function guestJoin(code){netClose(1);NET.role='guest';await unmask();const pc=new RTCPeerConnection({iceServers:[]});NET.pc=pc;hook(pc);pc.ondatachannel=e=>setupDC(e.channel);await pc.setRemoteDescription(await dec(code));await pc.setLocalDescription(await pc.createAnswer());await waitICE(pc);NET.code=await enc(pc.localDescription)}
+function netClose(keep){const was=NET.open;try{NET.dc&&(NET.dc.onclose=null,NET.dc.close())}catch(e){}try{NET.pc&&NET.pc.close()}catch(e){}try{NET.peer&&NET.peer.destroy()}catch(e){}NET.peer=null;NET.conn=null;try{NET.ms&&NET.ms.getTracks().forEach(t=>t.stop())}catch(e){}NET.ms=null;NET.rtt=null;NET.link='';NET.dc=null;NET.pc=null;NET.open=false;NET.role=null;NET.started=0;NET.snapAt=0;NET.gb.clear();Q=null;NET.win='';NET.code='';if(S=='play'||S=='over')S='menu';if(!keep){view=0;mpShow(false)}paused=false}
 const $=id=>document.getElementById(id);
 function mpShow(on){$('mp').style.display=on?'block':'none'}
 let mpKind='',mpMan=false;
 const mpSt=t=>{$('mpSt').textContent=t},mpErr=t=>{$('mpErr').textContent=t};
+async function unmask(){const c=document.getElementById('mpLan');if(!c||!c.checked||NET.ms)return;try{NET.ms=await navigator.mediaDevices.getUserMedia({audio:true});mpSt(L('Local address enabled','Локальный адрес включён'))}catch(e){mpSt(L('Microphone not allowed - direct local link may not work','Микрофон не разрешён - прямая локальная связь может не работать'))}}
 function hook(pc){pc.onconnectionstatechange=()=>mpSt('WebRTC: '+pc.connectionState);pc.oniceconnectionstatechange=()=>mpSt('ICE: '+pc.iceConnectionState)}
 function loadPeer(){return new Promise((res,rej)=>{if(typeof Peer!='undefined')return res();const sc=document.createElement('script');sc.src='https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js';sc.onload=()=>res();sc.onerror=()=>rej(new Error('lib'));document.head.appendChild(sc)})}
 const RCH='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -219,19 +223,19 @@ const rcode=()=>{let c='';for(let i=0;i<5;i++)c+=RCH[Math.random()*RCH.length|0]
 function mkAd(conn){const a={readyState:conn.open?'open':'connecting',send:m=>conn.send(m),close:()=>{try{conn.close()}catch(e){}},onmessage:null,onclose:null,onopen:null};conn.on('open',()=>{a.readyState='open';a.onopen&&a.onopen()});conn.on('data',d=>{a.onmessage&&a.onmessage({data:d})});conn.on('close',()=>{a.readyState='closed';a.onclose&&a.onclose()});conn.on('error',()=>{});return a}
 function mpHint(t){mpErr(L('Could not reach the matchmaking server. Online mode needs internet and the game opened from your own site (it does not work inside the Claude preview). ','Не удаётся связаться с сервером. Онлайн-режим требует интернет и игру, открытую с вашего сайта (внутри окна Claude он не работает). ')+(t?'['+t+']':''))}
 function roomHost(tries){tries=tries||0;netClose(1);NET.role='host';mpErr('');$('mpRoom').style.display='none';mpSt(L('Connecting to the server…','Подключаемся к серверу…'));
-loadPeer().then(()=>{const code=rcode(),p=new Peer('stkmn-'+code);NET.peer=p;let opened=0;const to=setTimeout(()=>{if(!opened)mpHint('timeout')},10000);
+unmask().then(loadPeer).then(()=>{const code=rcode(),p=new Peer('stkmn-'+code);NET.peer=p;let opened=0;const to=setTimeout(()=>{if(!opened)mpHint('timeout')},10000);
 p.on('open',()=>{opened=1;clearTimeout(to);$('mpCode').textContent=code;$('mpRoom').style.display='block';mpSt(L('Waiting for your friend…','Ждём друга…'))});
 p.on('connection',conn=>{if(NET.open||NET.conn){try{conn.close()}catch(e){}return}NET.conn=conn;setupDC(mkAd(conn))});
 p.on('error',er=>{clearTimeout(to);if(er.type=='unavailable-id'&&tries<3)roomHost(tries+1);else mpHint(er.type)})}).catch(()=>mpHint('lib'))}
 function roomJoin(code){code=(code||'').trim().toUpperCase();if(code.length<4){mpErr(L('Enter the room code.','Введите код комнаты.'));return}netClose(1);NET.role='guest';mpErr('');mpSt(L('Connecting…','Подключаемся…'));
-loadPeer().then(()=>{const p=new Peer();NET.peer=p;let ok=0;const to=setTimeout(()=>{if(!ok)mpErr(L('Room not found, or the network blocks the connection.','Комната не найдена или сеть блокирует соединение.'))},15000);
-p.on('open',()=>{const conn=p.connect('stkmn-'+code,{reliable:true,serialization:'json'});const ad=mkAd(conn);conn.on('open',()=>{ok=1;clearTimeout(to);setupDC(ad)});conn.on('error',er=>mpErr(String(er)))});
+unmask().then(loadPeer).then(()=>{const p=new Peer();NET.peer=p;let ok=0;const to=setTimeout(()=>{if(!ok)mpErr(L('Room not found, or the network blocks the connection.','Комната не найдена или сеть блокирует соединение.'))},15000);
+p.on('open',()=>{const conn=p.connect('stkmn-'+code,{reliable:true,serialization:'json'});NET.conn=conn;const ad=mkAd(conn);conn.on('open',()=>{ok=1;clearTimeout(to);setupDC(ad)});conn.on('error',er=>mpErr(String(er)))});
 p.on('error',er=>{clearTimeout(to);if(er.type=='peer-unavailable')mpErr(L('Room not found. Check the code.','Комната не найдена. Проверьте код.'));else mpHint(er.type)})}).catch(()=>mpHint('lib'))}
 function mpLabels(){const h=mpKind=='host';$('mpT').textContent=h?L('Host game: ','Создать игру: ')+(NET.gmode=='pvp'?L('Duel','Дуэль'):L('Co-op','Кооператив')):L('Join game','Присоединиться');
 $('mpRoomL').textContent=L('Your room code — tell it to your friend:','Код комнаты — назовите его другу:');$('mpJoinL').textContent=L('Enter the room code from your friend:','Введите код комнаты от друга:');$('mpJoinGo').textContent=L('Join','Войти');
 $('mpI').textContent=h?L('1) Send this code to your friend:','1) Отправьте этот код другу:'):L('Send this answer code back to the host, then wait:','Отправьте этот ответный код хосту и ждите:');
 $('mpI2').textContent=h?L('2) Paste your friend\'s answer code and press Connect:','2) Вставьте ответный код друга и нажмите «Соединить»:'):L('Paste the host code and press Create answer:','Вставьте код хоста и нажмите «Создать ответ»:');
-$('mpGo').textContent=h?L('Connect','Соединить'):L('Create answer','Создать ответ');$('mpCopy').textContent=L('Copy','Копировать');$('mpBack').textContent='‹ '+L('Back','Назад');$('mpMan').textContent=mpMan?L('Use room code','Через код комнаты'):L('Manual mode (no internet)','Ручной режим (без интернета)')}
+$('mpGo').textContent=h?L('Connect','Соединить'):L('Create answer','Создать ответ');$('mpLanL').textContent=L('Direct local link (asks microphone permission once, nothing is recorded)','Прямая локальная связь (один раз спросит доступ к микрофону, ничего не записывается)');$('mpCopy').textContent=L('Copy','Копировать');$('mpBack').textContent='‹ '+L('Back','Назад');$('mpMan').textContent=mpMan?L('Use room code','Через код комнаты'):L('Manual mode (no internet)','Ручной режим (без интернета)')}
 function mpView(){const h=mpKind=='host';$('mpRoom').style.display='none';$('mpJoin').style.display=(!mpMan&&!h)?'block':'none';$('mpA').style.display=(mpMan&&h)?'block':'none';$('mpB').style.display=mpMan?'block':'none';mpLabels()}
 function mpOpen(kind,gm){mpKind=kind;mpMan=false;if(gm)NET.gmode=gm;NET.err='';mpShow(true);mpErr('');mpSt('');$('mpOut').value='';$('mpIn').value='';mpView();if(kind=='host')roomHost()}
 $('mpJoinGo').onclick=()=>roomJoin($('mpJoinIn').value);
@@ -476,7 +480,7 @@ if(e.at&&e.w!='fist'&&e.at!='sh'&&hs<=0){const ln=WP[e.w].L+6;e.tr.push({x:J.hl.
 for(let k=1;k<e.tr.length;k++){g.fillStyle=(e.bot?'rgba(220,30,30,':'rgba('+ELC[ELEM[e.w]||'wind'][2]+',')+(k/e.tr.length*.5)+')';g.beginPath();g.moveTo(J.hl.x,J.hl.y);g.lineTo(e.tr[k-1].x,e.tr[k-1].y);g.lineTo(e.tr[k].x,e.tr[k].y);g.fill()}}
 }}
 for(const p of pts){if(p.rg){g.strokeStyle=p.c;g.lineWidth=3;g.globalAlpha=Math.min(1,p.l*4);g.beginPath();g.arc(p.x,p.y,(.25-p.l)*220,0,7);g.stroke()}else{g.fillStyle=p.c;g.globalAlpha=Math.min(1,p.l*3);g.fillRect(p.x,p.y,3,3)}}g.globalAlpha=1;g.restore();vig();
-if(P){g.fillStyle='rgba(0,0,0,.5)';g.fillRect(10,10,160,14);g.fillStyle='#d33';g.fillRect(12,12,Math.max(0,P.hp/12)*156,10);if(isMP()&&Q){g.fillStyle='rgba(0,0,0,.5)';g.fillRect(180,10,160,14);g.fillStyle='#38f';g.fillRect(182,12,Math.max(0,Q.hp/12)*156,10)}
+if(P){g.fillStyle='rgba(0,0,0,.5)';g.fillRect(10,10,160,14);g.fillStyle='#d33';g.fillRect(12,12,Math.max(0,P.hp/12)*156,10);if(isMP()&&Q){g.fillStyle='rgba(0,0,0,.5)';g.fillRect(180,10,160,14);g.fillStyle='#38f';g.fillRect(182,12,Math.max(0,Q.hp/12)*156,10)}if(isMP()){g.fillStyle='#333';g.font='12px sans-serif';g.textAlign='right';g.fillText((NET.rtt!=null?NET.rtt+' ms':'...')+' | '+(NET.link||'?'),790,54);g.textAlign='left'}
 g.fillStyle='#222';g.font='bold 15px sans-serif';g.textAlign='left';g.fillText(L(M.n,M.nr)+' · '+L('wave ','волна ')+wave+' · '+L('kills ','убито ')+kills+' · '+WNN[LG][P.w],12,42)}
 g.textAlign='center';
 if(S=='play'){if(GH<VH){g.fillStyle='#0c0c11';g.fillRect(0,GH,800,VH-GH);g.fillStyle='rgba(255,255,255,.12)';g.fillRect(0,GH,800,2)}if(UIon&&js){g.globalAlpha=.25;g.fillStyle='#000';g.beginPath();g.arc(js.x,js.y,50*jsS,0,7);g.fill();g.globalAlpha=.6;g.beginPath();g.arc(js.x+tsx*50*jsS,js.y+tsy*50*jsS,22*jsS,0,7);g.fill()}
